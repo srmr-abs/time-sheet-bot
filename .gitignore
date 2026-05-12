@@ -24,3 +24,8 @@ node_modules/
 # IDE and logs
 .vscode/
 *.log
+
+# Jest coverage and performance reports
+.coverage/
+.jestPerformanceReport.json
+.jestPerformanceReport.csv
