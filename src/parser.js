@@ -31,13 +31,20 @@ class MessageParser {
   }
 
   detectStatus(message) {
-    // Check each status keyword using whole-word matching
+    // Build a flat list of all keywords and sort by length (longest first)
+    // so that multi-word aliases like "lunch break" are checked before "break"
+    const allKeywords = [];
     for (const [status, keywords] of Object.entries(this.statusKeywords)) {
       for (const keyword of keywords) {
-        const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-        if (regex.test(message)) {
-          return status;
-        }
+        allKeywords.push({ status, keyword });
+      }
+    }
+    allKeywords.sort((a, b) => b.keyword.length - a.keyword.length);
+
+    for (const { status, keyword } of allKeywords) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(message)) {
+        return status;
       }
     }
     return null;

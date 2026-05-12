@@ -62,6 +62,31 @@ describe('MessageParser', () => {
 					expect.objectContaining({ ambiguous: true })
 				);
 			});
+
+			test('parses at 9:30 AM', () => {
+				const result = parser.parse('connected at 9:30 AM');
+				expect(result.timestamp, JSON.stringify({ input: 'connected at 9:30 AM' })).not.toBeNull();
+				expect(result.timestamp.getHours(), 'hours').toBe(9);
+				expect(result.timestamp.getMinutes(), 'minutes').toBe(30);
+			});
+
+			test('parses 12:00 AM as midnight', () => {
+				const result = parser.parse('connected 12:00 AM');
+				expect(result.timestamp, JSON.stringify({ input: 'connected 12:00 AM' })).not.toBeNull();
+				expect(result.timestamp.getHours(), 'hours').toBe(0);
+			});
+
+			test('parses 12:00 PM as noon', () => {
+				const result = parser.parse('connected 12:00 PM');
+				expect(result.timestamp, JSON.stringify({ input: 'connected 12:00 PM' })).not.toBeNull();
+				expect(result.timestamp.getHours(), 'hours').toBe(12);
+			});
+
+			test('parses 9am without colon or space', () => {
+				const result = parser.parse('connected 9am');
+				expect(result.timestamp, JSON.stringify({ input: 'connected 9am' })).not.toBeNull();
+				expect(result.timestamp.getHours(), 'hours').toBe(9);
+			});
 		});
 
 		describe('unrecognized input', () => {
@@ -84,6 +109,58 @@ describe('MessageParser', () => {
 		test('is case-insensitive', () => {
 			expect(parser.detectStatus('CONNECTED'), 'input: CONNECTED').toBe('connected');
 		});
+
+		test('connect maps to connected', () => {
+			expect(parser.detectStatus('connect'), 'input: connect').toBe('connected');
+		});
+
+		test('in maps to connected', () => {
+			expect(parser.detectStatus('in'), 'input: in').toBe('connected');
+		});
+
+		test('online maps to connected', () => {
+			expect(parser.detectStatus('online'), 'input: online').toBe('connected');
+		});
+
+		test('disconnect maps to disconnected', () => {
+			expect(parser.detectStatus('disconnect'), 'input: disconnect').toBe('disconnected');
+		});
+
+		test('end maps to disconnected', () => {
+			expect(parser.detectStatus('end'), 'input: end').toBe('disconnected');
+		});
+
+		test('off maps to disconnected', () => {
+			expect(parser.detectStatus('off'), 'input: off').toBe('disconnected');
+		});
+
+		test('done maps to disconnected', () => {
+			expect(parser.detectStatus('done'), 'input: done').toBe('disconnected');
+		});
+
+		test('brb maps to break', () => {
+			expect(parser.detectStatus('brb'), 'input: brb').toBe('break');
+		});
+
+		test('lunchbreak maps to lunch', () => {
+			expect(parser.detectStatus('lunchbreak'), 'input: lunchbreak').toBe('lunch');
+		});
+
+		test('lunch break maps to lunch', () => {
+			expect(parser.detectStatus('lunch break'), 'input: lunch break').toBe('lunch');
+		});
+
+		test('return maps to back', () => {
+			expect(parser.detectStatus('return'), 'input: return').toBe('back');
+		});
+
+		test('returned maps to back', () => {
+			expect(parser.detectStatus('returned'), 'input: returned').toBe('back');
+		});
+
+		test('breakfast does not match break', () => {
+			expect(parser.detectStatus('breakfast'), 'input: breakfast').toBeNull();
+		});
 	});
 
 	describe('extractNotes', () => {
@@ -91,6 +168,11 @@ describe('MessageParser', () => {
 			const result = parser.extractNotes('connected @ 9:00 AM working on features', 'connected');
 			expect(result.toLowerCase(), JSON.stringify({ input: 'connected @ 9:00 AM working on features' })).toContain('working');
 			expect(result.toLowerCase(), 'should not contain connected').not.toContain('connected');
+		});
+
+		test('returns empty string when only status and time remain', () => {
+			const result = parser.extractNotes('connected @ 9:00 AM', 'connected');
+			expect(result, JSON.stringify({ input: 'connected @ 9:00 AM' })).toBe('');
 		});
 	});
 

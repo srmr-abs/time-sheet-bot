@@ -67,6 +67,40 @@ describe('TimeCalculator', () => {
 					})
 				);
 			});
+
+			test('multiple breaks are both subtracted', () => {
+				const entries = [
+					timeEntry({ status: 'connected', timestamp: makeDate(9, 0) }),
+					timeEntry({ status: 'break', timestamp: makeDate(11, 0) }),
+					timeEntry({ status: 'back', timestamp: makeDate(11, 15) }),
+					timeEntry({ status: 'break', timestamp: makeDate(12, 0) }),
+					timeEntry({ status: 'back', timestamp: makeDate(13, 0) }),
+					timeEntry({ status: 'disconnected', timestamp: makeDate(17, 0) }),
+				];
+				const result = calc.calculateDaySummary(entries);
+				expect(result, JSON.stringify({ input: entries })).toEqual(
+					expect.objectContaining({
+						workMinutes: 405,
+						breakMinutes: 75,
+						totalMinutes: 480,
+					})
+				);
+			});
+
+			test('sorts out-of-order entries before calculating', () => {
+				const entries = [
+					timeEntry({ status: 'disconnected', timestamp: makeDate(17, 0) }),
+					timeEntry({ status: 'connected', timestamp: makeDate(9, 0) }),
+				];
+				const result = calc.calculateDaySummary(entries);
+				expect(result, JSON.stringify({ input: entries })).toEqual(
+					expect.objectContaining({
+						workMinutes: 480,
+						breakMinutes: 0,
+						totalMinutes: 480,
+					})
+				);
+			});
 		});
 
 		describe('edge cases', () => {
@@ -89,6 +123,14 @@ describe('TimeCalculator', () => {
 
 			test('hours and minutes returns combined string', () => {
 				expect(calc.formatDuration(125), 'input: 125').toBe('2h 5m');
+			});
+
+			test('zero minutes returns 0m', () => {
+				expect(calc.formatDuration(0), 'input: 0').toBe('0m');
+			});
+
+			test('exactly one hour returns 1h', () => {
+				expect(calc.formatDuration(60), 'input: 60').toBe('1h');
 			});
 		});
 	});
@@ -159,6 +201,12 @@ describe('TimeCalculator', () => {
 			const summary = { workMinutes: 420, breakMinutes: 60 };
 			const result = calc.getSummaryText(summary, 'Bob', '2026-05-12');
 			expect(result, JSON.stringify({ input: summary })).toContain('Break: 1h');
+		});
+
+		test('omits break text when break is zero', () => {
+			const summary = { workMinutes: 480, breakMinutes: 0 };
+			const result = calc.getSummaryText(summary, 'Carol', '2026-05-12');
+			expect(result, JSON.stringify({ input: summary })).not.toContain('Break:');
 		});
 	});
 });
