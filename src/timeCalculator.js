@@ -5,16 +5,99 @@ class TimeCalculator {
   calculateDaySummary(entries) {
     if (entries.length === 0) return null;
 
-    // Sort entries by timestamp
-    const sorted = [...entries].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    // Tag each entry with its original insertion order so multi-session days
+    // can be split correctly even when clock times overlap.
+    const annotated = [...entries];
+    annotated.forEach((e, i) => (e._tmpIdx = i));
 
+    // Sort entries by timestamp, using insertion order as a tie-breaker
+    const sorted = [...annotated].sort((a, b) => {
+      const tDiff = a.timestamp.getTime() - b.timestamp.getTime();
+      return tDiff !== 0 ? tDiff : a._tmpIdx - b._tmpIdx;
+    });
+
+    // Handle multiple work sessions on the same day independently
+    const sessions = this._extractSessions(sorted);
+    if (sessions.length === 0) {
+      return this._calculateBlock(sorted);
+    }
+
+    let totalWorkMinutes = 0;
+    let totalBreakMinutes = 0;
+
+    for (const session of sessions) {
+      const result = this._calculateBlock(session);
+      totalWorkMinutes += result.workMinutes;
+      totalBreakMinutes += result.breakMinutes;
+    }
+
+    return {
+      totalMinutes: totalWorkMinutes + totalBreakMinutes,
+      breakMinutes: totalBreakMinutes,
+      workMinutes: totalWorkMinutes,
+      entries: sorted
+    };
+  }
+
+  /**
+   * Extract non-overlapping connected...disconnected sessions from sorted entries.
+   * Uses original insertion order (_tmpIdx) so sessions are grouped by the
+   * chronological span between each connected and its matching disconnected.
+   */
+  _extractSessions(sorted) {
+    const stack = [];
+    const rawSessions = [];
+
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].status === 'connected') {
+        stack.push(i);
+      } else if (sorted[i].status === 'disconnected') {
+        if (stack.length > 0) {
+          rawSessions.push({ start: stack.pop(), end: i });
+        }
+      }
+    }
+
+    // Process inner (earlier-closing) sessions first so their entries
+    // don't leak into outer sessions.
+    rawSessions.sort((a, b) => sorted[a.end]._tmpIdx - sorted[b.end]._tmpIdx);
+
+    const assigned = new Set(); // tracks _tmpIdx, not sorted-array index
+    const sessions = [];
+
+    for (const { start, end } of rawSessions) {
+      const startEntry = sorted[start];
+      const endEntry = sorted[end];
+      const sessionEntries = [];
+      for (const entry of sorted) {
+        if (
+          !assigned.has(entry._tmpIdx) &&
+          entry._tmpIdx >= startEntry._tmpIdx &&
+          entry._tmpIdx <= endEntry._tmpIdx
+        ) {
+          sessionEntries.push(entry);
+          assigned.add(entry._tmpIdx);
+        }
+      }
+      if (sessionEntries.length > 0) {
+        sessions.push(sessionEntries);
+      }
+    }
+
+    return sessions;
+  }
+
+  /**
+   * Calculate work/break minutes for a single contiguous session.
+   */
+  _calculateBlock(blockEntries) {
     let totalMinutes = 0;
     let breakMinutes = 0;
     let currentStart = null;
     let onBreak = false;
     let breakStart = null;
 
-    for (const entry of sorted) {
+    for (const entry of blockEntries) {
       switch (entry.status) {
         case 'connected':
           if (!currentStart) {
@@ -25,17 +108,15 @@ class TimeCalculator {
         case 'break':
         case 'lunch':
           if (currentStart && !onBreak) {
-            // Add time from start to break
             totalMinutes += this.getMinutesDiff(currentStart, entry.timestamp);
             breakStart = entry.timestamp;
             onBreak = true;
-            currentStart = null; // Work paused, now on break
+            currentStart = null;
           }
           break;
 
         case 'back':
           if (onBreak && breakStart) {
-            // Calculate break duration
             breakMinutes += this.getMinutesDiff(breakStart, entry.timestamp);
             currentStart = entry.timestamp;
             onBreak = false;
@@ -45,12 +126,10 @@ class TimeCalculator {
 
         case 'disconnected':
           if (currentStart) {
-            // Add final work period
             totalMinutes += this.getMinutesDiff(currentStart, entry.timestamp);
             currentStart = null;
           }
           if (onBreak && breakStart) {
-            // If disconnected while on break, count break time
             breakMinutes += this.getMinutesDiff(breakStart, entry.timestamp);
             onBreak = false;
             breakStart = null;
@@ -59,13 +138,10 @@ class TimeCalculator {
       }
     }
 
-    const grossMinutes = totalMinutes + breakMinutes;
-
     return {
-      totalMinutes: grossMinutes,
+      totalMinutes: totalMinutes + breakMinutes,
       breakMinutes,
-      workMinutes: totalMinutes,
-      entries: sorted
+      workMinutes: totalMinutes
     };
   }
 

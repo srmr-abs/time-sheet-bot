@@ -161,9 +161,10 @@ describe('TimesheetHandler', () => {
 		test('summary command with entries returns TSV', async () => {
 			await handler.processMessage({ ...base, messageId: 'm2', text: 'connected @ 9:00 AM' });
 			await handler.processMessage({ ...base, messageId: 'm3', text: 'disconnected @ 5:00 PM' });
-			const result = await handler.processMessage({ ...base, messageId: 'm4', text: 'summary u1 2026-05-12' });
+			const today = handler.calculator.formatDate(new Date());
+			const result = await handler.processMessage({ ...base, messageId: 'm4', text: `summary u1 ${today}` });
 			expect(result, 'summary response').toContain('Date');
-			expect(result, 'summary response').toContain('2026-05-12');
+			expect(result, 'summary response').toContain(today);
 		});
 
 		test('summary with invalid format returns error', async () => {

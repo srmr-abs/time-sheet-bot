@@ -103,7 +103,65 @@ describe('TimeCalculator', () => {
 			});
 		});
 
-		describe('edge cases', () => {
+		describe('multiple sessions', () => {
+		test('same-day sessions with identical break times stay isolated', () => {
+			// Simulates testing the bot twice with identical break times but
+			// different connected start times.  Storage insertion order is used
+			// to keep each session strictly separate.
+			const entries = [
+				// First session (inserted first)
+				timeEntry({ status: 'connected', timestamp: makeDate(10, 0) }),
+				timeEntry({ status: 'break', timestamp: makeDate(13, 0) }),
+				timeEntry({ status: 'back', timestamp: makeDate(14, 0) }),
+				timeEntry({ status: 'disconnected', timestamp: makeDate(18, 0) }),
+				// Second session (inserted later)
+				timeEntry({ status: 'connected', timestamp: makeDate(9, 0) }),
+				timeEntry({ status: 'break', timestamp: makeDate(13, 0) }),
+				timeEntry({ status: 'back', timestamp: makeDate(14, 0) }),
+				timeEntry({ status: 'disconnected', timestamp: makeDate(18, 0) }),
+			];
+			const result = calc.calculateDaySummary(entries);
+			expect(result, JSON.stringify({ input: entries })).toEqual(
+				expect.objectContaining({
+					workMinutes: 900, // 7h first + 8h second = 15h total
+					breakMinutes: 120, // 1h first + 1h second = 2h total
+					totalMinutes: 1020, // 17h gross
+				})
+			);
+			
+			// Also verify each individual session is correct
+			const sessions = calc._extractSessions(
+				[...entries].map((e, i) => { e._tmpIdx = i; return e; })
+					.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+			);
+			expect(sessions.length).toBe(2);
+			expect(calc._calculateBlock(sessions[0]).workMinutes).toBe(420); // first
+			expect(calc._calculateBlock(sessions[1]).workMinutes).toBe(480); // second
+			
+			// Also confirm that the previous "inner session" case still works
+			const entries2 = [
+				timeEntry({ status: 'connected', timestamp: makeDate(9, 0) }),
+				timeEntry({ status: 'break', timestamp: makeDate(12, 0) }),
+				timeEntry({ status: 'back', timestamp: makeDate(13, 0) }),
+				timeEntry({ status: 'disconnected', timestamp: makeDate(17, 0) }),
+				// Afternoon entries chronologically before the first session's disconnected time
+				timeEntry({ status: 'connected', timestamp: makeDate(16, 23) }),
+				timeEntry({ status: 'break', timestamp: makeDate(16, 24) }),
+				timeEntry({ status: 'back', timestamp: makeDate(16, 25) }),
+				timeEntry({ status: 'disconnected', timestamp: makeDate(16, 26) }),
+			];
+			const result2 = calc.calculateDaySummary(entries2);
+			expect(result2, JSON.stringify({ input: entries2 })).toEqual(
+				expect.objectContaining({
+					workMinutes: 422, // 7h 2m
+					breakMinutes: 61, // 1h 1m
+					totalMinutes: 483, // 8h 3m
+				})
+			);
+		});
+	});
+
+	describe('edge cases', () => {
 			test('empty entries returns null', () => {
 				const result = calc.calculateDaySummary([]);
 				expect(result, JSON.stringify({ input: [] })).toBeNull();
