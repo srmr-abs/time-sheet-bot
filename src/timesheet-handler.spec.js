@@ -138,9 +138,9 @@ describe('TimesheetHandler', () => {
 			expect(result, 'ambiguous response').toContain('AM or PM');
 		});
 
-		test('valid connected stores entry silently', async () => {
+		test('valid connected stores entry and acknowledges', async () => {
 			const result = await handler.processMessage({ ...base, text: 'connected @ 9:00 AM' });
-			expect(result, 'connected response').toBeNull();
+			expect(result, 'connected response').toContain('Connected at');
 			const entries = handler.storage.getUserEntries('c1', 'u1');
 			expect(entries.length, 'entries after connected').toBe(1);
 			expect(entries[0].status, 'stored status').toBe('connected');
@@ -183,6 +183,109 @@ describe('TimesheetHandler', () => {
 		test('tally with invalid format returns error', async () => {
 			const result = await handler.processMessage({ ...base, text: 'tally' });
 			expect(result, 'invalid tally').toContain('Invalid tally command format');
+		});
+	});
+
+	describe('integration scenarios', () => {
+		const base = { conversationId: 'c1', messageId: 'm1', userId: 'u1', userName: 'Alice' };
+		let msgId;
+
+		beforeEach(() => {
+			msgId = 0;
+		});
+
+		function next() {
+			msgId++;
+			return `m${msgId}`;
+		}
+
+		async function send(handler, text) {
+			return handler.processMessage({ ...base, messageId: next(), text });
+		}
+
+		test('full day with breaks', async () => {
+			await send(handler, 'connected @ 9:00 AM');
+			await send(handler, 'break @ 12:00 PM');
+			await send(handler, 'back @ 1:00 PM');
+			const result = await send(handler, 'disconnected @ 5:00 PM');
+			expect(result, 'summary').toContain('Net Work Time: 7h');
+			expect(result, 'summary').toContain('Break: 1h');
+		});
+
+		test('multiple breaks', async () => {
+			await send(handler, 'connected @ 9:00 AM');
+			await send(handler, 'break @ 11:00 AM');
+			await send(handler, 'back @ 11:15 AM');
+			await send(handler, 'lunch @ 12:30 PM');
+			await send(handler, 'back @ 1:30 PM');
+			const result = await send(handler, 'disconnected @ 6:00 PM');
+			expect(result, 'summary').toContain('Net Work Time: 7h 45m');
+			expect(result, 'summary').toContain('Break: 1h 15m');
+		});
+
+		test('disconnected while on break', async () => {
+			await send(handler, 'connected @ 9:00 AM');
+			await send(handler, 'break @ 12:00 PM');
+			const result = await send(handler, 'disconnected @ 2:00 PM');
+			expect(result, 'summary').toContain('Net Work Time: 3h');
+			expect(result, 'summary').toContain('Break: 2h');
+		});
+
+		test('multiple sessions in one day', async () => {
+			await send(handler, 'connected @ 9:00 AM');
+			await send(handler, 'break @ 11:00 AM');
+			await send(handler, 'back @ 11:15 AM');
+			await send(handler, 'disconnected @ 12:00 PM');
+			await send(handler, 'connected @ 2:00 PM');
+			const result = await send(handler, 'disconnected @ 5:00 PM');
+			expect(result, 'summary').toContain('Net Work Time: 5h 45m');
+			expect(result, 'summary').toContain('Break: 15m');
+		});
+
+		test('state guards block invalid transitions', async () => {
+			const r1 = await send(handler, 'break @ 12:00 PM');
+			expect(r1, 'idle->break blocked').toContain('connected first');
+
+			await send(handler, 'connected @ 9:00 AM');
+
+			const r2 = await send(handler, 'connected @ 10:00 AM');
+			expect(r2, 'working->connected blocked').toContain('already connected');
+
+			await send(handler, 'break @ 12:00 PM');
+
+			const r3 = await send(handler, 'break @ 2:00 PM');
+			expect(r3, 'on_break->break blocked').toContain('already on a break');
+
+			await send(handler, 'back @ 1:00 PM');
+
+			const r4 = await send(handler, 'back @ 3:00 PM');
+			expect(r4, 'working->back blocked').toContain('not on a break');
+
+			await send(handler, 'disconnected @ 5:00 PM');
+
+			const r5 = await send(handler, 'disconnected @ 5:00 PM');
+			expect(r5, 'idle->disconnected blocked').toContain('No active session');
+		});
+
+		test('ambiguous time without AM/PM is rejected', async () => {
+			const result = await send(handler, 'connected @ 9:30');
+			expect(result, 'ambiguous').toContain('AM or PM');
+		});
+
+		test('notes are preserved in entries', async () => {
+			await send(handler, 'connected @ 8:00 AM working on project Alpha');
+			await send(handler, 'break @ 12:00 PM lunch with team');
+			await send(handler, 'back @ 1:00 PM');
+			const result = await send(handler, 'disconnected @ 5:00 PM wrapping up');
+			expect(result, 'summary').toContain('Net Work Time: 8h');
+
+			const entries = handler.storage.getUserEntries('c1', 'u1');
+			const connectedEntry = entries.find(e => e.status === 'connected');
+			const breakEntry = entries.find(e => e.status === 'break');
+			const disconnectedEntry = entries.find(e => e.status === 'disconnected');
+			expect(connectedEntry.notes).toContain('project Alpha');
+			expect(breakEntry.notes).toContain('lunch with team');
+			expect(disconnectedEntry.notes).toContain('wrapping up');
 		});
 	});
 

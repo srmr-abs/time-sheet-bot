@@ -165,6 +165,25 @@ class TimesheetHandler {
 			}
 		}
 
+		const timeStr = timestamp.toLocaleTimeString('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true,
+		});
+
+		if (parsed.status === 'connected') {
+			return `👍 Connected at ${timeStr}`;
+		}
+		if (parsed.status === 'break') {
+			return `👍 Break started at ${timeStr}`;
+		}
+		if (parsed.status === 'lunch') {
+			return `👍 Lunch started at ${timeStr}`;
+		}
+		if (parsed.status === 'back') {
+			return `👍 Back at ${timeStr}`;
+		}
+
 		return null;
 	}
 

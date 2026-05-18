@@ -9,6 +9,7 @@ env/.env.playground
 m365agents.local.yml
 m365agents.playground.yml
 appPackage/build
+js-utils/
 
 # dependencies
 node_modules/
