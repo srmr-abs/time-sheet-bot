@@ -23,18 +23,20 @@ const createTokenFactory = () => {
 	};
 };
 
-// Configure authentication using TokenCredentials
-const tokenCredentials = {
-	clientId: process.env.CLIENT_ID || "",
-	token: createTokenFactory(),
-};
-
-const credentialOptions =
-	config.MicrosoftAppType === "UserAssignedMsi" ? { ...tokenCredentials } : undefined;
+// Configure authentication explicitly so we don't rely on hidden env-var fallbacks
+const authOptions = {};
+if (config.MicrosoftAppType === "UserAssignedMsi") {
+	authOptions.clientId = config.MicrosoftAppId || process.env.CLIENT_ID || "";
+	authOptions.token = createTokenFactory();
+} else {
+	// Local dev / MultiTenant: pass client secret explicitly if available
+	if (config.MicrosoftAppId) authOptions.clientId = config.MicrosoftAppId;
+	if (config.MicrosoftAppPassword) authOptions.clientSecret = config.MicrosoftAppPassword;
+}
 
 // Create the app with storage
 const app = new App({
-	...credentialOptions,
+	...authOptions,
 	storage,
 });
 
