@@ -144,7 +144,8 @@ class MessageParser {
     return `**Timesheet Bot Help**
 
 **Track your time by sending status messages:**
-(The bot tracks silently - no confirmation messages)
+All commands below are tracked **silently** to avoid noise in the chat.
+The bot only replies when you send \`disconnected\`, showing your net hours.
 
 • **Connected:** \`connected\`, \`connect\`, \`start\`, \`in\`, \`online\`
 • **Disconnected:** \`disconnected\`, \`disconnect\`, \`end\`, \`off\`, \`done\` (shows net hours)

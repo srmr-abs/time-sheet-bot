@@ -138,9 +138,9 @@ describe('TimesheetHandler', () => {
 			expect(result, 'ambiguous response').toContain('AM or PM');
 		});
 
-		test('valid connected stores entry and acknowledges', async () => {
+		test('valid connected stores entry silently', async () => {
 			const result = await handler.processMessage({ ...base, text: 'connected @ 9:00 AM' });
-			expect(result, 'connected response').toContain('Connected at');
+			expect(result, 'connected should be silent').toBeNull();
 			const entries = handler.storage.getUserEntries('c1', 'u1');
 			expect(entries.length, 'entries after connected').toBe(1);
 			expect(entries[0].status, 'stored status').toBe('connected');
