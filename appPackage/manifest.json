@@ -59,7 +59,21 @@
     ],
     "validDomains": [],
     "webApplicationInfo": {
-        "id": "${{BOT_ID}}",
-        "resource": "https://www.example.com"
+  "id": "${{BOT_ID}}",
+  "resource": "api://${{BOT_ID}}"
+},
+    "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "type": "Application",
+          "name": "ChannelMessage.Read.Group"
+        },
+        {
+          "type": "Application",
+          "name": "ChatMessage.Read.Chat"
+        }
+      ]
     }
+  }
 }
