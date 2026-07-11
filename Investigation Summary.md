@@ -22,17 +22,16 @@ Verify whether the Microsoft Teams bot can receive and respond to messages **wit
 - Tested bot response using:
   - `@LogTrackerDev hi`
   - `hi` (without mention)
-- Checked whether requests reached the local bot.
+- Checked whether requests reached the local bot - After added in teams, the response is not reaching the bot.
 - Added logging in the bot application (`app.js`) to verify incoming requests.
 - Verified ngrok traffic using the ngrok inspection page.
-- Reviewed Microsoft 365 Agents Toolkit configuration.
-- Investigated Dev Tunnel configuration and local environment settings.
+- Reviewed Microsoft 365 Agents Toolkit configuration - When pressing f5 the debug starts to work and request from teams able to reach the bot and reply also receiving to teams.
 
 ---
 
 ## Observations
 
-- No requests reached the local bot.
+- No requests reached the local bot once it added to teams.
 - No incoming requests appeared in the ngrok inspector.
 - No logs were generated in `app.js`.
 - Even `@LogTrackerDev hi` did not invoke the bot.
@@ -60,3 +59,6 @@ Further investigation into the Microsoft 365 Agents Toolkit provisioning and bot
 ## Recommendation
 
 As the issue is related to the development environment and bot endpoint configuration rather than the implementation, it is recommended to **close this investigation for now** and proceed with an alternative implementation approach (such as the Power Automate + SharePoint or webhook-based approach discussed earlier).
+
+## Notes:
+The can be able to done by using power automate itself, the thing we decided to more for some other approach is , difficult to handle complex logic in power automate.
